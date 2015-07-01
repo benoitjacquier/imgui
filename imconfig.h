@@ -1,13 +1,10 @@
 //-----------------------------------------------------------------------------
 // USER IMPLEMENTATION
+// This file contains compile-time options for ImGui.
+// Other options (memory allocation overrides, callbacks, etc.) can be set at runtime via the ImGuiIO structure - ImGui::GetIO().
 //-----------------------------------------------------------------------------
 
 #pragma once
-
-//---- Define your own malloc/free/realloc functions if you want to override internal memory allocations for ImGui
-//#define IM_MALLOC(_SIZE)			MyMalloc(_SIZE)			// void* MyMalloc(size_t size);
-//#define IM_FREE(_PTR)				MyFree(_PTR)			// void MyFree(void *ptr);
-//#define IM_REALLOC(_PTR, _SIZE)	MyRealloc(_PTR, _SIZE)	// void* MyRealloc(void *ptr, size_t size);
 
 //---- Define your own ImVector<> type if you don't want to use the provided implementation defined in imgui.h
 //#include <vector>
@@ -17,13 +14,30 @@
 //---- Define assertion handler. Defaults to calling assert().
 //#define IM_ASSERT(_EXPR)  MyAssert(_EXPR)
 
-//---- Don't implement default clipboard handlers for Windows (so as not to link with OpenClipboard(), etc.)
+//---- Define attributes of all API symbols declarations, e.g. for DLL under Windows.
+//#define IMGUI_API __declspec( dllexport )
+//#define IMGUI_API __declspec( dllimport )
+
+//---- Include imgui_user.inl at the end of imgui.cpp so you can include code that extends ImGui using its private data/functions.
+//#define IMGUI_INCLUDE_IMGUI_USER_INL
+
+//---- Include imgui_user.h at the end of imgui.h
+//#define IMGUI_INCLUDE_IMGUI_USER_H
+
+//---- Don't implement default handlers for Windows (so as not to link with OpenClipboard() and others Win32 functions)
 //#define IMGUI_DISABLE_WIN32_DEFAULT_CLIPBOARD_FUNCS
+//#define IMGUI_DISABLE_WIN32_DEFAULT_IME_FUNCS
 
-//---- Include imgui_user.cpp at the end of imgui.cpp so you can include code that extends ImGui using its private data/functions.
-//#define IMGUI_INCLUDE_IMGUI_USER_CPP
+//---- Don't implement help and test window functionality (ShowUserGuide()/ShowStyleEditor()/ShowTestWindow() methods will be empty)
+//#define IMGUI_DISABLE_TEST_WINDOWS
 
-//---- Define implicit cast operators to convert back<>forth from your math types and ImVec2/ImVec4.
+//---- Don't define obsolete functions names
+//#define IMGUI_DISABLE_OBSOLETE_FUNCTIONS
+
+//---- Implement STB libraries in a namespace to avoid conflicts
+//#define IMGUI_STB_NAMESPACE     ImStb
+
+//---- Define constructor and implicit cast operators to convert back<>forth from your math types and ImVec2/ImVec4.
 /*
 #define IM_VEC2_CLASS_EXTRA                                                 \
         ImVec2(const MyVec2& f) { x = f.x; y = f.y; }                       \
@@ -35,12 +49,13 @@
 */
 
 //---- Freely implement extra functions within the ImGui:: namespace.
-//---- e.g. you can create variants of the ImGui::Value() helper for your low-level math types.
+//---- Declare helpers or widgets implemented in imgui_user.inl or elsewhere, so end-user doesn't need to include multiple files.
+//---- e.g. you can create variants of the ImGui::Value() helper for your low-level math types, or your own widgets/helpers.
 /*
 namespace ImGui
 {
     void    Value(const char* prefix, const MyVec2& v, const char* float_format = NULL);
     void    Value(const char* prefix, const MyVec4& v, const char* float_format = NULL);
-};
+}
 */
 
