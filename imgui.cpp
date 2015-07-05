@@ -8294,6 +8294,186 @@ void ImGui::ColorEditMode(ImGuiColorEditMode mode)
     window->DC.ColorEditMode = mode;
 }
 
+
+void ImGui::ColorPicker(bool *opened, float col[4])
+{
+	ImGuiState& g = *GImGui;
+	const int windowWidth = 180;
+	const int smallWidth = 20;
+	
+	ImU32 black = ColorConvertFloat4ToU32(ImVec4(0,0,0,1));
+	ImU32 white = ColorConvertFloat4ToU32(ImVec4(1,1,1,1));
+	static float hue, sat, val;
+	static ImVec4 s_color(1, 0, 0, 1);
+	static bool wasOpened = false;
+			
+	if( opened==false )
+	{
+		wasOpened = false;
+		return;
+	}
+
+	bool justOpened = *opened && !wasOpened;
+
+	if( justOpened ) 
+	{
+		s_color = ImVec4(col[0], col[1], col[2], col[3] );	
+		
+	}
+
+	ColorConvertRGBtoHSV(s_color.x, s_color.y, s_color.z, hue, sat, val);
+	
+	
+	ImGui::Begin("ColorPicker", opened, ImVec2(windowWidth, 350), -1.0f, ImGuiWindowFlags_NoResize);
+
+	ImGuiWindow* colorWindow = GetCurrentWindow();
+
+	//Actual color
+	ImGui::BeginChild("ColorAlpha", ImVec2(windowWidth, smallWidth+5), false);
+	{
+		ImGuiWindow* window = GetCurrentWindow();
+		window->DrawList->AddRectFilled(window->Pos, window->Pos + ImVec2(120, smallWidth), ColorConvertFloat4ToU32(ImVec4(s_color.x, s_color.y, s_color.z, 1)), 0, 0);
+		window->DrawList->AddRectFilled(window->Pos + ImVec2(130, 0), window->Pos + ImVec2(130+smallWidth, smallWidth), ColorConvertFloat4ToU32(ImVec4(s_color.w, s_color.w, s_color.w, 1)), 0, 0);
+		ImGui::EndChild();
+	}
+
+	//Saturation quad
+	ImGui::Text("Colors");
+	ImGui::Separator();
+	{
+		
+		const int quadSize = windowWidth - smallWidth - colorWindow->WindowPadding().x * 2 - g.Style.ItemSpacing.x;
+		// Hue Saturation Value
+		ImGui::BeginChild("ValueSaturationQuad", ImVec2(quadSize, quadSize), false );
+		{
+			const int step = 5;
+			ImVec2 pos = ImVec2(0, 0);
+			ImGuiWindow* window = GetCurrentWindow();
+
+			ImVec4 c00(1, 1, 1, 1);
+			ImVec4 c10(1, 1, 1, 1);
+			ImVec4 c01(1, 1, 1, 1);
+			ImVec4 c11(1, 1, 1, 1);
+			for (int y = 0; y < step; y++) {
+				for (int x = 0; x < step; x++) {
+					float s0 = (float)x / (float)step;
+					float s1 = (float)(x + 1) / (float)step;
+					float v0 = 1.0 - (float)(y) / (float)step;
+					float v1 = 1.0 - (float)(y + 1) / (float)step;
+
+
+					ColorConvertHSVtoRGB(hue, s0, v0, c00.x, c00.y, c00.z);
+					ColorConvertHSVtoRGB(hue, s1, v0, c10.x, c10.y, c10.z);
+					ColorConvertHSVtoRGB(hue, s0, v1, c01.x, c01.y, c01.z);
+					ColorConvertHSVtoRGB(hue, s1, v1, c11.x, c11.y, c11.z);
+
+					window->DrawList->AddColorRectFilled(window->Pos + pos, window->Pos + pos + ImVec2(quadSize / step, quadSize / step),
+						ColorConvertFloat4ToU32(c00),
+						ColorConvertFloat4ToU32(c10),
+						ColorConvertFloat4ToU32(c11),
+						ColorConvertFloat4ToU32(c01));
+
+					pos.x += quadSize / step;
+				}
+				pos.x = 0;
+				pos.y += quadSize / step;
+			}
+
+			//window->DrawList->AddCircle(window->Pos + ImVec2(sat, 1-val)*quadSize, 4, val<0.5f?white:black, 4);
+
+			const ImGuiID id = window->GetID("ValueSaturationQuad");
+			ImRect bb(window->Pos, window->Pos + window->Size);
+			bool hovered, held;
+			bool pressed = ButtonBehavior(bb, id, &hovered, &held, false, false);
+			if (held)
+			{
+				ImVec2 pos = g.IO.MousePos - window->Pos;
+				sat = ImSaturate(pos.x / (float)quadSize);
+				val = 1 - ImSaturate(pos.y / (float)quadSize);
+				float dummy;
+				ColorConvertHSVtoRGB(hue, sat, val, s_color.x, s_color.y, s_color.z);
+			}
+
+		}
+		ImGui::EndChild();	// ValueSaturationQuad
+
+		ImGui::SameLine();
+
+		//Vertical tint
+		ImGui::BeginChild("Tint", ImVec2(20, quadSize), false);
+		{
+			const int step = 8;
+			const int width = 20;
+			ImGuiWindow* window = GetCurrentWindow();
+			ImVec2 pos(0, 0);
+			ImVec4 c0(1, 1, 1, 1);
+			ImVec4 c1(1, 1, 1, 1);
+			for (int y = 0; y < step; y++) {
+				float tint0 = (float)(y) / (float)step;
+				float tint1 = (float)(y + 1) / (float)step;
+				ColorConvertHSVtoRGB(tint0, 1.0, 1.0, c0.x, c0.y, c0.z);
+				ColorConvertHSVtoRGB(tint1, 1.0, 1.0, c1.x, c1.y, c1.z);
+
+				window->DrawList->AddColorRectFilled(window->Pos + pos, window->Pos + pos + ImVec2(width, quadSize / step),
+					ColorConvertFloat4ToU32(c0),
+					ColorConvertFloat4ToU32(c0),
+					ColorConvertFloat4ToU32(c1),
+					ColorConvertFloat4ToU32(c1));
+
+				pos.y += quadSize / step;
+			}
+
+			window->DrawList->AddCircle(window->Pos + ImVec2(10, hue*quadSize), 4, black, 4);
+			//window->DrawList->AddLine(window->Pos + ImVec2(0, hue*quadSize), window->Pos + ImVec2(width, hue*quadSize), ColorConvertFloat4ToU32(ImVec4(0, 0, 0, 1)));
+			bool hovered, held;
+			const ImGuiID id = window->GetID("Tint");
+			ImRect bb(window->Pos, window->Pos + window->Size);
+			bool pressed = ButtonBehavior(bb, id, &hovered, &held, false, false);
+			if (held)
+			{
+				
+				ImVec2 pos = g.IO.MousePos - window->Pos;
+				hue = ImClamp( pos.y / (float)quadSize, 0.0f, 1.0f );
+				ColorConvertHSVtoRGB(hue, sat, val, s_color.x, s_color.y, s_color.z);
+			}
+		}
+		ImGui::EndChild(); // "Tint"
+
+		//Sliders
+		ImGui::Text("Sliders");
+		ImGui::Separator();
+
+		{
+			int r = ImSaturate(s_color.x)*255.f;
+			int g = ImSaturate(s_color.y)*255.f;
+			int b = ImSaturate(s_color.z)*255.f;
+			int a = ImSaturate(s_color.w)*255.f;
+			ImGui::SliderInt("R", &r, 0, 255);
+			ImGui::SliderInt("G", &g, 0, 255);
+			ImGui::SliderInt("B", &b, 0, 255);
+			ImGui::SliderInt("A", &a, 0, 255);
+
+			s_color.x = (float)r / 255.f;
+			s_color.y = (float)g / 255.f;
+			s_color.z = (float)b / 255.f;
+			s_color.w = (float)a / 255.f;
+
+			//ColorConvertRGBtoHSV(s_color.x, s_color.y, s_color.z, tint, sat, val);*/
+		}
+
+	}
+
+	ImGui::End();
+
+	wasOpened = *opened;
+
+	col[0] = s_color.x;
+	col[1] = s_color.y;
+	col[2] = s_color.z;
+	col[3] = s_color.w;
+}
+
+
 // Horizontal separating line.
 void ImGui::Separator()
 {
