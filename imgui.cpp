@@ -9125,6 +9125,20 @@ void ImDrawList::AddRectFilled(const ImVec2& a, const ImVec2& b, ImU32 col, floa
     }
 }
 
+void ImDrawList::AddColorRectFilled(const ImVec2& a, const ImVec2& b, ImU32 col1, ImU32 col2, ImU32 col3, ImU32 col4)
+{
+	// Use triangle so we can merge more draw calls together (at the cost of extra vertices)
+	PrimReserve(6);
+	const ImVec2 uv = GImGui->FontTexUvWhitePixel;
+
+	PrimVtx(ImVec2(a.x,a.y),uv, col1);
+	PrimVtx(ImVec2(b.x,a.y),uv, col2);
+	PrimVtx(ImVec2(b.x,b.y),uv, col3);
+	PrimVtx(ImVec2(a.x,a.y),uv, col1);
+	PrimVtx(ImVec2(b.x,b.y),uv, col3);
+	PrimVtx(ImVec2(a.x,b.y),uv, col4);
+}
+
 void ImDrawList::AddTriangleFilled(const ImVec2& a, const ImVec2& b, const ImVec2& c, ImU32 col)
 {
     if ((col >> 24) == 0)
