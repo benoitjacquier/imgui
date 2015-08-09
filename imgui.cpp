@@ -8127,7 +8127,14 @@ bool ImGui::ColorButton(const ImVec4& col, bool small_height, bool outline_borde
 
     bool hovered, held;
     bool pressed = ButtonBehavior(bb, id, &hovered, &held, true);
-    RenderFrame(bb.Min, bb.Max, window->Color(col), outline_border, style.FrameRounding);
+
+	ImVec4 colRGB(col);
+	colRGB.w = 255;
+	RenderFrame( bb.Min, bb.Max, window->Color( colRGB ), outline_border, style.FrameRounding );
+	ImVec4 colAlpha;
+	colAlpha.x = colAlpha.y = colAlpha.z = col.w;
+	colAlpha.w = 255;
+
 
     if (hovered)
     {
@@ -8294,8 +8301,9 @@ void ImGui::ColorEditMode(ImGuiColorEditMode mode)
     window->DC.ColorEditMode = mode;
 }
 
+static ImVec4 GColorPickerColor;
 
-void ImGui::ColorPicker(bool *opened, float col[4])
+void ImGui::ColorPickerWindow(bool *opened, float col[4])
 {
 	ImGuiState& g = *GImGui;
 	const int windowWidth = 180;
@@ -8304,26 +8312,14 @@ void ImGui::ColorPicker(bool *opened, float col[4])
 	ImU32 black = ColorConvertFloat4ToU32(ImVec4(0,0,0,1));
 	ImU32 white = ColorConvertFloat4ToU32(ImVec4(1,1,1,1));
 	static float hue, sat, val;
-	static ImVec4 s_color(1, 0, 0, 1);
-	static bool wasOpened = false;
-			
-	if( opened==false )
+
+	if( *opened==false )
 	{
-		wasOpened = false;
 		return;
 	}
 
-	bool justOpened = *opened && !wasOpened;
+	ColorConvertRGBtoHSV( GColorPickerColor.x, GColorPickerColor.y, GColorPickerColor.z, hue, sat, val );
 
-	if( justOpened ) 
-	{
-		s_color = ImVec4(col[0], col[1], col[2], col[3] );	
-		
-	}
-
-	ColorConvertRGBtoHSV(s_color.x, s_color.y, s_color.z, hue, sat, val);
-	
-	
 	ImGui::Begin("ColorPicker", opened, ImVec2(windowWidth, 350), -1.0f, ImGuiWindowFlags_NoResize);
 
 	ImGuiWindow* colorWindow = GetCurrentWindow();
@@ -8332,8 +8328,13 @@ void ImGui::ColorPicker(bool *opened, float col[4])
 	ImGui::BeginChild("ColorAlpha", ImVec2(windowWidth, smallWidth+5), false);
 	{
 		ImGuiWindow* window = GetCurrentWindow();
-		window->DrawList->AddRectFilled(window->Pos, window->Pos + ImVec2(120, smallWidth), ColorConvertFloat4ToU32(ImVec4(s_color.x, s_color.y, s_color.z, 1)), 0, 0);
-		window->DrawList->AddRectFilled(window->Pos + ImVec2(130, 0), window->Pos + ImVec2(130+smallWidth, smallWidth), ColorConvertFloat4ToU32(ImVec4(s_color.w, s_color.w, s_color.w, 1)), 0, 0);
+		ImVec4 colorRGB( GColorPickerColor );
+		colorRGB.w = 1;
+		window->DrawList->AddRectFilled( window->Pos, window->Pos+ImVec2( 120, smallWidth ), ColorConvertFloat4ToU32( colorRGB ), 0, 0 );
+		ImVec4 colorAlpha;
+		colorAlpha.x = colorAlpha.y = colorAlpha.z = GColorPickerColor.w;
+		colorAlpha.w = 1;
+		window->DrawList->AddRectFilled(window->Pos + ImVec2(130, 0), window->Pos + ImVec2(130+smallWidth, smallWidth), ColorConvertFloat4ToU32(colorAlpha), 0, 0);
 		ImGui::EndChild();
 	}
 
@@ -8391,7 +8392,7 @@ void ImGui::ColorPicker(bool *opened, float col[4])
 				sat = ImSaturate(pos.x / (float)quadSize);
 				val = 1 - ImSaturate(pos.y / (float)quadSize);
 				float dummy;
-				ColorConvertHSVtoRGB(hue, sat, val, s_color.x, s_color.y, s_color.z);
+				ColorConvertHSVtoRGB(hue, sat, val, GColorPickerColor.x, GColorPickerColor.y, GColorPickerColor.z);
 			}
 
 		}
@@ -8434,7 +8435,7 @@ void ImGui::ColorPicker(bool *opened, float col[4])
 				
 				ImVec2 pos = g.IO.MousePos - window->Pos;
 				hue = ImClamp( pos.y / (float)quadSize, 0.0f, 1.0f );
-				ColorConvertHSVtoRGB(hue, sat, val, s_color.x, s_color.y, s_color.z);
+				ColorConvertHSVtoRGB( hue, sat, val, GColorPickerColor.x, GColorPickerColor.y, GColorPickerColor.z );
 			}
 		}
 		ImGui::EndChild(); // "Tint"
@@ -8444,19 +8445,19 @@ void ImGui::ColorPicker(bool *opened, float col[4])
 		ImGui::Separator();
 
 		{
-			int r = ImSaturate(s_color.x)*255.f;
-			int g = ImSaturate(s_color.y)*255.f;
-			int b = ImSaturate(s_color.z)*255.f;
-			int a = ImSaturate(s_color.w)*255.f;
+			int r = ImSaturate( GColorPickerColor.x )*255.f;
+			int g = ImSaturate( GColorPickerColor.y )*255.f;
+			int b = ImSaturate( GColorPickerColor.z )*255.f;
+			int a = ImSaturate( GColorPickerColor.w )*255.f;
 			ImGui::SliderInt("R", &r, 0, 255);
 			ImGui::SliderInt("G", &g, 0, 255);
 			ImGui::SliderInt("B", &b, 0, 255);
 			ImGui::SliderInt("A", &a, 0, 255);
 
-			s_color.x = (float)r / 255.f;
-			s_color.y = (float)g / 255.f;
-			s_color.z = (float)b / 255.f;
-			s_color.w = (float)a / 255.f;
+			GColorPickerColor.x = (float)r/255.f;
+			GColorPickerColor.y = (float)g/255.f;
+			GColorPickerColor.z = (float)b/255.f;
+			GColorPickerColor.w = (float)a/255.f;
 
 			//ColorConvertRGBtoHSV(s_color.x, s_color.y, s_color.z, tint, sat, val);*/
 		}
@@ -8465,12 +8466,51 @@ void ImGui::ColorPicker(bool *opened, float col[4])
 
 	ImGui::End();
 
-	wasOpened = *opened;
+	col[0] = GColorPickerColor.x;
+	col[1] = GColorPickerColor.y;
+	col[2] = GColorPickerColor.z;
+	col[3] = GColorPickerColor.w;
+}
 
-	col[0] = s_color.x;
-	col[1] = s_color.y;
-	col[2] = s_color.z;
-	col[3] = s_color.w;
+void ImGui::ColorPicker( const char* label, float col[4] ) 
+{
+	ImVec4 color( col[0], col[1], col[2], col[3] );
+	ImVec4 colorAlpha( col[3], col[3], col[3], 1 );
+
+	ImGuiState& g = *GImGui;
+	ImGuiWindow* window = GetCurrentWindow();
+	if(window->SkipItems)
+		return;
+
+	const ImGuiID id = window->GetID( label );
+	static ImGuiID colorPickerFocus = -1;
+	static bool bPickerOpened = false;
+	bool clicked = false;
+
+	PushID( label );
+	if( ColorButton( color ) )
+		clicked = true;
+	PopID();
+
+	/*
+	ImGui::SameLine();
+	if(ColorButton( colorAlpha ))
+		clicked = true;
+	*/
+
+	ImGui::SameLine();
+	ImGui::Text( label );
+
+	if(clicked) {
+		GColorPickerColor = color;
+		colorPickerFocus = id;
+		bPickerOpened = true;
+	}
+
+	if(id==colorPickerFocus) 
+	{
+		ColorPickerWindow( &bPickerOpened, col );
+	}
 }
 
 
