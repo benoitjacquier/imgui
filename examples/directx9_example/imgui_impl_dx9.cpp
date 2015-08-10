@@ -15,7 +15,9 @@ static INT64                    g_Time = 0;
 static INT64                    g_TicksPerSecond = 0;
 static LPDIRECT3DDEVICE9        g_pd3dDevice = NULL;
 static LPDIRECT3DVERTEXBUFFER9  g_pVB = NULL;
-static int                      VERTEX_BUFFER_SIZE = 30000;     // TODO: Make vertex buffer smaller and grow dynamically as needed.
+static LPDIRECT3DINDEXBUFFER9   g_pIB = NULL;
+static int                      VERTEX_BUFFER_SIZE = 20000;     // TODO: Make buffers smaller and grow dynamically as needed.
+static int                      INDEX_BUFFER_SIZE = 40000;      // TODO: Make buffers smaller and grow dynamically as needed.
 
 struct CUSTOMVERTEX
 {
@@ -28,23 +30,20 @@ struct CUSTOMVERTEX
 // This is the main rendering function that you have to implement and provide to ImGui (via setting up 'RenderDrawListsFn' in the ImGuiIO structure)
 // If text or lines are blurry when integrating ImGui in your engine:
 // - in your Render function, try translating your projection matrix by (0.5f,0.5f) or (0.375f,0.375f)
-static void ImGui_ImplDX9_RenderDrawLists(ImDrawList** const cmd_lists, int cmd_lists_count)
+static void ImGui_ImplDX9_RenderDrawLists(ImDrawData* draw_data)
 {
-    size_t total_vtx_count = 0;
-    for (int n = 0; n < cmd_lists_count; n++)
-        total_vtx_count += cmd_lists[n]->vtx_buffer.size();
-    if (total_vtx_count == 0)
-        return;
-
     // Copy and convert all vertices into a single contiguous buffer
     CUSTOMVERTEX* vtx_dst;
-    if (g_pVB->Lock(0, (UINT)total_vtx_count, (void**)&vtx_dst, D3DLOCK_DISCARD) < 0)
+    ImDrawIdx* idx_dst;
+    if (g_pVB->Lock(0, (UINT)(draw_data->TotalVtxCount * sizeof(CUSTOMVERTEX)), (void**)&vtx_dst, D3DLOCK_DISCARD) < 0)
         return;
-    for (int n = 0; n < cmd_lists_count; n++)
+    if (g_pIB->Lock(0, (UINT)(draw_data->TotalIdxCount * sizeof(ImDrawIdx)), (void**)&idx_dst, D3DLOCK_DISCARD) < 0)
+        return;
+    for (int n = 0; n < draw_data->CmdListsCount; n++)
     {
-        const ImDrawList* cmd_list = cmd_lists[n];
-        const ImDrawVert* vtx_src = &cmd_list->vtx_buffer[0];
-        for (size_t i = 0; i < cmd_list->vtx_buffer.size(); i++)
+        const ImDrawList* cmd_list = draw_data->CmdLists[n];
+        const ImDrawVert* vtx_src = &cmd_list->VtxBuffer[0];
+        for (int i = 0; i < cmd_list->VtxBuffer.size(); i++)
         {
             vtx_dst->pos.x = vtx_src->pos.x;
             vtx_dst->pos.y = vtx_src->pos.y;
@@ -55,9 +54,13 @@ static void ImGui_ImplDX9_RenderDrawLists(ImDrawList** const cmd_lists, int cmd_
             vtx_dst++;
             vtx_src++;
         }
+        memcpy(idx_dst, &cmd_list->IdxBuffer[0], cmd_list->IdxBuffer.size() * sizeof(ImDrawIdx));
+        idx_dst += cmd_list->IdxBuffer.size();
     }
     g_pVB->Unlock();
+    g_pIB->Unlock();
     g_pd3dDevice->SetStreamSource( 0, g_pVB, 0, sizeof( CUSTOMVERTEX ) );
+    g_pd3dDevice->SetIndices( g_pIB );
     g_pd3dDevice->SetFVF( D3DFVF_CUSTOMVERTEX );
 
     // Setup render state: fixed-pipeline, alpha-blending, no face culling, no depth testing
@@ -90,25 +93,27 @@ static void ImGui_ImplDX9_RenderDrawLists(ImDrawList** const cmd_lists, int cmd_
 
     // Render command lists
     int vtx_offset = 0;
-    for (int n = 0; n < cmd_lists_count; n++)
+    int idx_offset = 0;
+    for (int n = 0; n < draw_data->CmdListsCount; n++)
     {
-        const ImDrawList* cmd_list = cmd_lists[n];
-        for (size_t cmd_i = 0; cmd_i < cmd_list->commands.size(); cmd_i++)
+        const ImDrawList* cmd_list = draw_data->CmdLists[n];
+        for (int cmd_i = 0; cmd_i < cmd_list->CmdBuffer.size(); cmd_i++)
         {
-            const ImDrawCmd* pcmd = &cmd_list->commands[cmd_i];
-            if (pcmd->user_callback)
+            const ImDrawCmd* pcmd = &cmd_list->CmdBuffer[cmd_i];
+            if (pcmd->UserCallback)
             {
-                pcmd->user_callback(cmd_list, pcmd);
+                pcmd->UserCallback(cmd_list, pcmd);
             }
             else
             {
-                const RECT r = { (LONG)pcmd->clip_rect.x, (LONG)pcmd->clip_rect.y, (LONG)pcmd->clip_rect.z, (LONG)pcmd->clip_rect.w };
-                g_pd3dDevice->SetTexture( 0, (LPDIRECT3DTEXTURE9)pcmd->texture_id );
+                const RECT r = { (LONG)pcmd->ClipRect.x, (LONG)pcmd->ClipRect.y, (LONG)pcmd->ClipRect.z, (LONG)pcmd->ClipRect.w };
+                g_pd3dDevice->SetTexture( 0, (LPDIRECT3DTEXTURE9)pcmd->TextureId );
                 g_pd3dDevice->SetScissorRect(&r);
-                g_pd3dDevice->DrawPrimitive(D3DPT_TRIANGLELIST, vtx_offset, pcmd->vtx_count/3);
+                g_pd3dDevice->DrawIndexedPrimitive(D3DPT_TRIANGLELIST, vtx_offset, 0, (UINT)cmd_list->VtxBuffer.size(), idx_offset, pcmd->ElemCount/3);
             }
-            vtx_offset += pcmd->vtx_count;
+            idx_offset += pcmd->ElemCount;
         }
+        vtx_offset += cmd_list->VtxBuffer.size();
     }
 }
 
@@ -169,6 +174,8 @@ bool    ImGui_ImplDX9_Init(void* hwnd, IDirect3DDevice9* device)
     io.KeyMap[ImGuiKey_RightArrow] = VK_RIGHT;
     io.KeyMap[ImGuiKey_UpArrow] = VK_UP;
     io.KeyMap[ImGuiKey_DownArrow] = VK_DOWN;
+    io.KeyMap[ImGuiKey_PageUp] = VK_PRIOR;
+    io.KeyMap[ImGuiKey_PageDown] = VK_NEXT;
     io.KeyMap[ImGuiKey_Home] = VK_HOME;
     io.KeyMap[ImGuiKey_End] = VK_END;
     io.KeyMap[ImGuiKey_Delete] = VK_DELETE;
@@ -238,6 +245,9 @@ bool ImGui_ImplDX9_CreateDeviceObjects()
     if (g_pd3dDevice->CreateVertexBuffer(VERTEX_BUFFER_SIZE * sizeof(CUSTOMVERTEX), D3DUSAGE_DYNAMIC | D3DUSAGE_WRITEONLY, D3DFVF_CUSTOMVERTEX, D3DPOOL_DEFAULT, &g_pVB, NULL) < 0)
         return false;
 
+    if (g_pd3dDevice->CreateIndexBuffer(INDEX_BUFFER_SIZE * sizeof(ImDrawIdx), D3DUSAGE_DYNAMIC | D3DUSAGE_WRITEONLY, D3DFMT_INDEX16, D3DPOOL_DEFAULT, &g_pIB, NULL) < 0)
+        return false;
+
     ImGui_ImplDX9_CreateFontsTexture();
     return true;
 }
@@ -250,6 +260,11 @@ void ImGui_ImplDX9_InvalidateDeviceObjects()
     {
         g_pVB->Release();
         g_pVB = NULL;
+    }
+    if (g_pIB)
+    {
+        g_pIB->Release();
+        g_pIB = NULL;
     }
     if (LPDIRECT3DTEXTURE9 tex = (LPDIRECT3DTEXTURE9)ImGui::GetIO().Fonts->TexID)
     {
