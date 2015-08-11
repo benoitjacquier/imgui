@@ -250,6 +250,7 @@ namespace ImGui
     IMGUI_API bool          ColorEdit3(const char* label, float col[3]);
     IMGUI_API bool          ColorEdit4(const char* label, float col[4], bool show_alpha = true);
     IMGUI_API void          ColorEditMode(ImGuiColorEditMode mode);
+	IMGUI_API void          ColorEditUsePicker( bool usePicker );
 	IMGUI_API void          ColorPicker( const char* label, float col[4] );
 	IMGUI_API void			ColorPickerWindow( bool *opened, float col[4] );
     IMGUI_API void          PlotLines(const char* label, const float* values, int values_count, int values_offset = 0, const char* overlay_text = NULL, float scale_min = FLT_MAX, float scale_max = FLT_MAX, ImVec2 graph_size = ImVec2(0,0), int stride = sizeof(float));

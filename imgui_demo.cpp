@@ -143,9 +143,10 @@ void ImGui::ShowTestWindow(bool* opened)
     //ImGui::PushItemWidth(ImGui::GetWindowWidth() * 0.65f);    // 2/3 of the space for widget and 1/3 for labels
     ImGui::PushItemWidth(-140);                                 // Right align, keep 140 pixels for labels
 
+	
     ImGui::Text("ImGui says hello.");
 
-    // Menu
+	// Menu
     if (ImGui::BeginMenuBar())
     {
         if (ImGui::BeginMenu("Menu"))
@@ -527,7 +528,8 @@ void ImGui::ShowTestWindow(bool* opened)
             ImGui::SliderAngle("slider angle", &angle);
         }
 
-        static float col1[3] = { 1.0f,0.0f,0.2f };
+
+		static float col1[3] = { 1.0f,0.0f,0.2f };
         static float col2[4] = { 0.4f,0.7f,0.0f,0.5f };
         ImGui::ColorEdit3("color 1", col1);
         ImGui::SameLine(); ShowHelpMarker("Click on the colored square to change edit mode.\nCTRL+click on individual component to input value.\n");
@@ -1440,12 +1442,16 @@ void ImGui::ShowStyleEditor(ImGuiStyle* ref)
         ImGui::RadioButton("HEX", &edit_mode, ImGuiColorEditMode_HEX);
         //ImGui::Text("Tip: Click on colored square to change edit mode.");
 
+		static bool useColorPicker= false;
+		ImGui::Checkbox("Use color picker", &useColorPicker);
+		
         static ImGuiTextFilter filter;
         filter.Draw("Filter colors", 200);
 
         ImGui::BeginChild("#colors", ImVec2(0, 300), true);
         ImGui::PushItemWidth(-160);
         ImGui::ColorEditMode(edit_mode);
+		ImGui::ColorEditUsePicker(useColorPicker);
         for (int i = 0; i < ImGuiCol_COUNT; i++)
         {
             const char* name = ImGui::GetStyleColName(i);

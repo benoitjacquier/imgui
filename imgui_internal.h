@@ -490,6 +490,7 @@ struct ImGuiDrawContext
     ImVector<float>         TextWrapPosStack;
     ImVector<ImGuiGroupData>GroupStack;
     ImGuiColorEditMode      ColorEditMode;
+	bool					ColorEditUsePicker;
     int                     StackSizesBackup[6];    // Store size of various stacks for asserting
 
     float                   ColumnsStartX;          // Indentation / start position from left of window (increased by TreePush/TreePop, etc.)
@@ -522,6 +523,7 @@ struct ImGuiDrawContext
         AllowKeyboardFocus = true;
         TextWrapPos = -1.0f;
         ColorEditMode = ImGuiColorEditMode_RGB;
+		ColorEditUsePicker = false;
         memset(StackSizesBackup, 0, sizeof(StackSizesBackup));
 
         ColumnsStartX = 0.0f;

@@ -3834,6 +3834,7 @@ bool ImGui::Begin(const char* name, bool* p_opened, const ImVec2& size_on_first_
         window->DC.TextWrapPos = -1.0f; // disabled
         window->DC.TextWrapPosStack.resize(0);
         window->DC.ColorEditMode = ImGuiColorEditMode_UserSelect;
+		window->DC.ColorEditUsePicker = false;
         window->DC.ColumnsCurrent = 0;
         window->DC.ColumnsCount = 1;
         window->DC.ColumnsStartPos = window->DC.CursorPos;
@@ -8136,6 +8137,10 @@ bool ImGui::ColorEdit3(const char* label, float col[3])
     return value_changed;
 }
 
+static ImVec4 GColorPickerColor;
+static bool GColorPickerOpened = false;
+static ImGuiID GColorPickerFocus = -1;
+
 // Edit colors components (each component in 0.0f..1.0f range
 // Use CTRL-Click to input value and TAB to go to next item.
 bool ImGui::ColorEdit4(const char* label, float col[4], bool alpha)
@@ -8151,8 +8156,9 @@ bool ImGui::ColorEdit4(const char* label, float col[4], bool alpha)
     const float square_sz = (g.FontSize + style.FramePadding.y * 2.0f);
 
     ImGuiColorEditMode edit_mode = window->DC.ColorEditMode;
-    if (edit_mode == ImGuiColorEditMode_UserSelect || edit_mode == ImGuiColorEditMode_UserSelectShowButton)
-        edit_mode = g.ColorEditModeStorage.GetInt(id, 0) % 3;
+
+	if (edit_mode == ImGuiColorEditMode_UserSelect || edit_mode == ImGuiColorEditMode_UserSelectShowButton)
+		edit_mode = g.ColorEditModeStorage.GetInt(id, 0) % 3;
 
     float f[4] = { col[0], col[1], col[2], col[3] };
 
@@ -8231,7 +8237,18 @@ bool ImGui::ColorEdit4(const char* label, float col[4], bool alpha)
 
     const ImVec4 col_display(col[0], col[1], col[2], 1.0f);
     if (ImGui::ColorButton(col_display))
-        g.ColorEditModeStorage.SetInt(id, (edit_mode + 1) % 3); // Don't set local copy of 'edit_mode' right away!
+	{
+		if( window->DC.ColorEditUsePicker )
+		{
+			GColorPickerColor = ImVec4( col[0], col[1], col[2], col[3] );
+			GColorPickerFocus = id;
+			GColorPickerOpened = true;
+		}
+		else
+		{
+			g.ColorEditModeStorage.SetInt(id, (edit_mode + 1) % 3); // Don't set local copy of 'edit_mode' right away!
+		}
+	}
 
     if (window->DC.ColorEditMode == ImGuiColorEditMode_UserSelectShowButton)
     {
@@ -8246,22 +8263,32 @@ bool ImGui::ColorEdit4(const char* label, float col[4], bool alpha)
         ImGui::SameLine(0, style.ItemInnerSpacing.x);
     }
 
+	
+
     ImGui::TextUnformatted(label, FindTextDisplayEnd(label));
 
     // Convert back
-    for (int n = 0; n < 4; n++)
-        f[n] = i[n] / 255.0f;
-    if (edit_mode == 1)
-        ImGui::ColorConvertHSVtoRGB(f[0], f[1], f[2], f[0], f[1], f[2]);
+	if( window->DC.ColorEditUsePicker )
+	{
+		if(id==GColorPickerFocus)
+			ColorPickerWindow( &GColorPickerOpened, col );
+	}
+	else
+	{
+		for (int n = 0; n < 4; n++)
+			f[n] = i[n] / 255.0f;
+		if (edit_mode == 1)
+			ImGui::ColorConvertHSVtoRGB(f[0], f[1], f[2], f[0], f[1], f[2]);
 
-    if (value_changed)
-    {
-        col[0] = f[0];
-        col[1] = f[1];
-        col[2] = f[2];
-        if (alpha)
-            col[3] = f[3];
-    }
+		if (value_changed)
+		{
+			col[0] = f[0];
+			col[1] = f[1];
+			col[2] = f[2];
+			if (alpha)
+				col[3] = f[3];
+		}
+	}
 
     ImGui::PopID();
     ImGui::EndGroup();
@@ -8275,7 +8302,12 @@ void ImGui::ColorEditMode(ImGuiColorEditMode mode)
     window->DC.ColorEditMode = mode;
 }
 
-static ImVec4 GColorPickerColor;
+void ImGui::ColorEditUsePicker( bool usePicker )
+{
+	ImGuiWindow* window = GetCurrentWindow();
+	window->DC.ColorEditUsePicker = usePicker;
+}
+
 
 void ImGui::ColorPickerWindow(bool *opened, float col[4])
 {
@@ -8456,8 +8488,7 @@ void ImGui::ColorPicker( const char* label, float col[4] )
 		return;
 
 	const ImGuiID id = window->GetID( label );
-	static ImGuiID colorPickerFocus = -1;
-	static bool bPickerOpened = false;
+	
 	bool clicked = false;
 
 	PushID( label );
@@ -8476,13 +8507,13 @@ void ImGui::ColorPicker( const char* label, float col[4] )
 
 	if(clicked) {
 		GColorPickerColor = color;
-		colorPickerFocus = id;
-		bPickerOpened = true;
+		GColorPickerFocus = id;
+		GColorPickerOpened = true;
 	}
 
-	if(id==colorPickerFocus) 
+	if(id==GColorPickerFocus) 
 	{
-		ColorPickerWindow( &bPickerOpened, col );
+		ColorPickerWindow( &GColorPickerOpened, col );
 	}
 }
 
